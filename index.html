@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+h1,p {
+  text-align: center
+}
+
+body {
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+}
+
+path {
+  stroke: #fff;
+  stroke-width: .5px;
+}
+
+path:hover {
+  fill: red;
+}
+
+</style>
+<body>
+    <div id="container">
+      <h1 id="title">United States Educational Attainment</h1>
+      <p id="description">Percentage of adults age 25 and older with a bachelor's degree or higher (2010-2014)</p>
+      <div id="map"></div>
+    </div>
+<script src="http://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="http://d3js.org/d3-scale-chromatic.v0.3.min.js"></script>
+<script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.11.0/d3-legend.min.js"></script>
+<script src="https://d3js.org/d3-selection-multi.v0.4.min.js"></script>
+<script>
+
+var width = 960,
+    height = 600;
+
+var path = d3.geoPath();
+
+var legendRectSize = 20;
+var legendSpacing = 20;
+
+var svg = d3.select("#map").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+//var color = d3.scaleQuantile().range(["#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#006d2c", "#00441b"]);
+
+var countiesUrl = "https://raw.githubusercontent.com/no-stack-dub-sack/testable-projects-fcc/master/src/data/choropleth_map/counties.json";
+var educationUrl = "https://raw.githubusercontent.com/no-stack-dub-sack/testable-projects-fcc/master/src/data/choropleth_map/for_user_education.json";
+
+let tooltip = d3.select('body').append('div')
+  tooltip.styles({
+      'position' : 'absolute',
+      'padding' : '4px',
+      'background' : '#fff',
+      'border': '1px solid #000',
+      'color':'#000'
+      });
+
+function mouseoverHandler(d) {
+tooltip.transition().style('opacity', .8)
+tooltip.styles({
+          'left' : (event.pageX + 10) + 'px',
+          'top' : (event.pageY + 15) + 'px'
+          })
+tooltip.html(`<p> State: ${d.state} </p>
+            <p>County: ${d.county} <p>
+            <p>Percent: ${d.value}%`)
+      .attr("data-education", `${d.value}`)
+      .attr("id", "tooltip")
+  
+d3.select(this)
+  .style('opacity', .1);
+}
+
+function mouseoutHandler(d) {
+  tooltip.transition().style('opacity', 0)  
+  d3.select(this)
+  .style('opacity', 1);
+}
+
+function mouseMoving (d) {
+  tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");
+  d3.select(this)
+  .style('opacity', 0.8);
+}
+
+d3.json(educationUrl, function(data) {
+    //color.domain([d3.min(data.)])
+    var color = d3.scaleSequential()
+    .domain([d3.min(data, (d) => d.bachelorsOrHigher), d3.max(data, (d) => d.bachelorsOrHigher)])
+    .interpolator(d3.interpolateGreens);
+    
+    d3.json(countiesUrl, function(error, topology) {
+        if (error) throw error;
+        var geojson = topojson.feature(topology, topology.objects.counties);
+        for(var i = 0; i < data.length; i++){
+          var dataID = +data[i].fips;
+          var state = data[i].state;
+          var county = data[i].area_name
+          var dataValue = parseFloat(data[i].bachelorsOrHigher);
+          for(var n = 0; n < geojson.features.length; n++){
+            var jsonID = geojson.features[n].id;
+            if(dataID === jsonID){
+              geojson.features[n].value = dataValue;
+              geojson.features[n].state = state;
+              geojson.features[n].county = county; 
+              break;
+            }
+          }
+        }
+
+        console.log(geojson);
+
+        svg.selectAll("path")
+            .data(geojson.features)
+            .enter().append("path")
+            .attr("class", "county")
+            .attr("data-fips", (d) => d.id)
+            .attr("data-education", (d) => d.value)
+            .attr("d", path)
+            .style("fill", function(d){
+            //get the data value
+            var value = d.value;
+
+            return value ? color(value) : "#ccc"
+
+          })
+            .on('mouseover', mouseoverHandler)
+            .on('mouseout', mouseoutHandler)
+            .on('mousemoving', mouseMoving);
+
+          // The legend
+  svg.append("g")
+    .attr("class", "legend")
+    .attr("id", "legend")
+    .attr("transform", "translate(600,20)");
+
+  var legendLinear = d3.legendColor()
+    .shapeWidth(30)
+    .cells(8)
+    .orient('horizontal')
+    .labelAlign("start")
+    .scale(color);
+
+  svg.select(".legend")
+    .call(legendLinear);
+        });
+})
+
+
+</script>
